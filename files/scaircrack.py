@@ -25,6 +25,7 @@ from pbkdf2 import *
 from numpy import array_split
 from numpy import array
 import hmac, hashlib
+from bitstring import BitArray
 
 def customPRF512(key,A,B):
     """
@@ -44,6 +45,8 @@ wpa=rdpcap("wpa_handshake.cap")
 
 # Used to get Nonce AP
 handshake_m1 = wpa[5]
+
+
 # Used to get Nonce Client
 handshake_m2 = wpa[6]
 # Used to get the MIC to test and the corresponding datas
@@ -67,7 +70,10 @@ SNonce      = a2b_hex(handshake_m2.original[65:97].hex()) #a2b_hex("7b3826876d14
 mic_to_test = a2b_hex(handshake_m4.original[-18:-2].hex()) #"36eef66540fa801ceee2fea9b7929b40"
 data        = handshake_m4.original[48:-18] + b'\0'*16 + handshake_m4.original[-2:] # Only want the message with MIC at 0.
 
-B           = min(APmac,Clientmac)+max(APmac,Clientmac)+min(ANonce,SNonce)+max(ANonce,SNonce) #used in pseudo-random function
+c = BitArray(hex=handshake_m4.original[54:55].hex()) # get 2 bytes of Key Information
+mic_type = int(c.bin[-3:],2) # get the last 3 bits corresponding to Key Descriptor Version
+
+B  = min(APmac,Clientmac)+max(APmac,Clientmac)+min(ANonce,SNonce)+max(ANonce,SNonce) #used in pseudo-random function
 
 print ("\n\nValues used to derivate keys")
 print ("============================")
@@ -82,20 +88,32 @@ wordlist = "wordlist.txt"
 
 f = open(wordlist, "r")
 
+print("Testing passphrases")
+print("=============================")
+
+success = False
+
 for phrase in f:
     phrase = phrase.strip('\n')
+    print("Testing: ", phrase)
     pmk = pbkdf2(hashlib.sha1, str.encode(phrase), str.encode(ssid), 4096, 32)
     ptk = customPRF512(pmk, str.encode(A), B)
-    print(phrase)
-    mic = hmac.new(ptk[0:16], data, hashlib.sha1).hexdigest()
-    print(mic)
-    print(mic[:-8])
-    print(mic_to_test.hex())
-    print()
+
+    #Depending on mic_type we switch hash algorithm
+    if mic_type == 2:
+        mic = hmac.new(ptk[0:16], data, hashlib.sha1).hexdigest()
+    elif mic_type == 1:
+        mic = hmac.new(ptk[0:16], data, hashlib.md5).hexdigest()
+    else:
+        print("Key Descriptor Version unkown")
+
+
     if mic[:-8] != mic_to_test.hex():
         continue
 
-    print("passphrase is : ", phrase)
+    success = True
+    print("\nPassphrase is : ", phrase)
+    print("=============================")
     print("\nResults of the key expansion")
     print("=============================")
     print("PMK:\t\t", pmk.hex(), "\n")
@@ -107,6 +125,10 @@ for phrase in f:
     print("MIC:\t\t", mic, "\n")
 
     break
+
+if not success:
+    print("\nNo passphrase found")
+    print("=============================")
 
 f.close()
 
