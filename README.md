@@ -37,7 +37,65 @@ Dans cette première partie, vous allez récupérer le script **Python3** [wpa\_
 - Ouvrir le fichier de capture [wpa\_key\_derivation.py](files/wpa_key_derivation.py) avec Wireshark
 - Exécuter le script avec ```python3 wpa_key_derivation.py```
 - Essayer d’identifier les valeurs affichées par le script dans la capture Wireshark
+
+Pour récupérer les MAC des deux devices on peut regarde le premier message d'authentification par exemple.
+
+![](./img/MAC_AP_Client_1.png)
+
+![](./img/MAC_AP_Client.png)
+
+Dans le premier message de la handshake on peut y voir le nonce de l'AP.
+
+![](./img/AP_nonce_1.png) 
+
+![](./img/AP_nonce.png)
+
+Dans le deuxième message de la handshake on peut y voir le nonce du client.
+
+![](./img/Client_Nonce_1.png)
+
+![](./img/Client_Nonce_2.png)
+
+Le MIC présent dans l'output du script est celui du 4ème message de la handshake, c'est celui qu'on va devoir comparé avec notre MIC calculé depuis un disctionnaire pour vérifier que c'est juste.
+
+![](./img/MIC_1.png)
+
+![](./img/MIC_2.png)
+
+Pour les autres valeurs, on ne les trouvera pas dans le fichier wireshark, elles sont cachées. Dans le script c'est que nous les calculons avec un mot de passe aléatoire "actuelle" car nous avons toutes les autres valeurs nécessaires qui sont : AP_MAC, AP_Client et les deux nonces.
+
 - Analyser le fonctionnement du script. En particulier, __faire attention__ à la variable ```data``` qui contient la payload de la trame et la comparer aux données de la quatrième trame du 4-way handshake. Lire [la fin de ce document](#quelques-éléments-à-considérer-) pour l’explication de la différence.
+
+Dans une première étape on récupère en dur toutes les valeurs nécessaire pour calculer le PTK. C'est à dire :
+
+- Les MACs et les Nonces
+  ![](./img/AP_Nonces.png)
+- Le SSID et le mode de passe afin de calculer le PMK
+  ![](./img/pass.png)
+  ![](./img/ssid.png)
+
+Ensuite on affiche toutes ces valeurs. L'étape d'après est de calculer le PMK avec la fonction pbkdf2 et les valeurs qu'on a récupéré avant.
+
+![](./img/pmk.png)
+
+ENsuite on calcule la PTK avec la fonction ```customPRF512```. On a regardé la documentation de la fonction [PRF512](http://etutorials.org/Networking/802.11+security.+wi-fi+protected+access+and+802.11i/Part+II+The+Design+of+Wi-Fi+Security/Chapter+10.+WPA+and+RSN+Key+Hierarchy/Computing+the+Temporal+Keys/), la fonction prend 3 paramètres : la clé PMK, un text string specifique à l'application (ici c'est **A**) et les Nonces/MACs (**B**).
+
+![](./img/A.png)
+
+![](./img/B.png)
+
+![](./img/PTK.png)
+
+Pour la dernière étape on génère le MIC à partir de notre nouvelle PTK et en récupérant le dernier message du handshake sans le MIC (**data**). Pour le calcul on utilise SHA-1 donc nous avons un chiffrement WPA2. 
+
+![](./img/data.png)
+
+![](./img/mic_to_test.png)
+
+![](./img/MIC.png)
+
+En analysant le message on constate que c'est en fait un résumé de la dernière trame qui est authentifié. Il prend la version, le type, la longueur et d'autres choses comme des IV et nonce initialisé à 0 et le MIC mais à 0.
+
 - __Modifier le script__ pour qu’il récupère automatiquement, à partir de la capture, les valeurs qui se trouvent actuellement codées en dur (```ssid```, ```APmac```, ```Clientmac```, nonces…) 
 
 
