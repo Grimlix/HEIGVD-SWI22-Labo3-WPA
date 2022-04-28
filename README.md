@@ -146,6 +146,12 @@ Utilisant votre script précédent, le modifier pour réaliser les taches suivan
 
 A manière de comparaison, réaliser l'attaque sur le [fichier de capture](files/PMKID_handshake.pcap) utilisant la méthode décrite [ici](https://hashcat.net/forum/thread-7717.html).
 
+![](./img/commande.png)
+
+Resulats :
+
+![](./img/result.png)
+
 
 ### 4. Scairodump (Challenge optionnel pour un bonus)
 
